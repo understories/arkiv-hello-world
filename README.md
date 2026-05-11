@@ -102,6 +102,63 @@ arkiv-hello-world/
 - [Arkiv Getting Started](https://arkiv.network/getting-started/typescript) - Wallet generation
 - [Braga Testnet Faucet](https://braga.hoodi.arkiv.network/faucet/) - Get testnet tokens
 
+## Network and Migration
+
+This template targets **Braga**, Arkiv's current public testnet. Snapshots, entities, and funded balances do not port between Arkiv testnets, so anyone running this code (and any agent helping with maintenance) should confirm the current network before assuming the configuration below is still up to date.
+
+### Current configuration
+
+| Setting | Value |
+| --- | --- |
+| Chain export | `braga` from `@arkiv-network/sdk/chains` |
+| Chain ID | `60138453102` |
+| HTTP RPC | `https://braga.hoodi.arkiv.network/rpc` |
+| WebSocket RPC | `wss://braga.hoodi.arkiv.network/rpc/ws` |
+| Explorer | `https://explorer.braga.hoodi.arkiv.network` |
+| Faucet | `https://braga.hoodi.arkiv.network/faucet/` |
+| Native gas token | test GLM |
+| SDK requirement | `@arkiv-network/sdk@^0.6.7` (the `braga` export requires `>= 0.6.5`) |
+
+### Testnet history
+
+Arkiv has rotated its public testnet as the protocol matured:
+
+1. **Mendoza** (early testnet, ETH gas token)
+2. **Kaolin** (deprecated, scheduled to stop responding on May 15, 2026, ETH gas token)
+3. **Braga** (current, GLM gas token)
+
+Official references:
+
+- Braga overview: https://docs.arkiv.network/networks/braga/
+- Kaolin to Braga migration notes: https://docs.arkiv.network/networks/migrate-from-kaolin/
+
+### Migrating this template to a future testnet
+
+The next time Arkiv announces a new testnet, the changes below are what this repository needs. The same checklist works whether you are a human maintainer or an AI assistant. Replace `braga` with the new chain name wherever it appears.
+
+1. Confirm the new chain is exported from `@arkiv-network/sdk/chains`. Run `npm view @arkiv-network/sdk version` to see the latest published SDK and check the release notes for the minimum version that includes the new chain.
+2. Bump `@arkiv-network/sdk` in `package.json` to that version and run `npm install` so `package-lock.json` updates.
+3. Edit `lib/arkiv/client.ts`:
+   - Replace the `import { braga } from "@arkiv-network/sdk/chains"` line.
+   - Replace both `chain: braga` references in `getPublicClient` and `getWalletClientFromPrivateKey`.
+   - Update the JSDoc comment that names the testnet.
+4. Edit `app/hello-world/page.tsx`:
+   - Two `href` templates point at `https://explorer.braga.hoodi.arkiv.network/entity/${...}` and `/tx/${...}`.
+   - One copy line reads `Connected to Braga Testnet`.
+5. Edit `scripts/generate-wallet.mjs` (one faucet URL in a `console.log`).
+6. Edit this `README.md` (Quick Start step 5, the "How It Works" line, the Resources list, and this Network and Migration section).
+7. Refund the deployment signing wallet on the new faucet, since balances do not port across testnets. Update the `ARKIV_PRIVATE_KEY` environment variable in your hosting provider if you rotate the wallet.
+8. Run `npm run typecheck` to confirm the new chain export resolves.
+9. Smoke test locally with `npm run dev` and post a message at `/hello-world`. Verify the entity and transaction links open the new explorer.
+
+Final check, useful as both the first and last step of a migration:
+
+```bash
+grep -rin "braga\|mendoza\|kaolin" --include="*.ts" --include="*.tsx" --include="*.md" --include="*.mjs" --include="*.json"
+```
+
+Any hits outside this Network and Migration section indicate stragglers that still need to be updated.
+
 ## License
 
 MIT
