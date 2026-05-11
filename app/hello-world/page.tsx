@@ -84,7 +84,7 @@ export default function ArkivHelloWorld() {
               and independently verifiable!
             </p>
             <p className="text-xs text-blue-700 mb-2">
-              🌐 Connected to <strong>Mendoza Testnet</strong> • 
+              🌐 Connected to <strong>Braga Testnet</strong> •
               Each message is stored as an <strong>entity</strong> (created via a <strong>transaction</strong>) • 
               Click links below to verify on the explorer
             </p>
@@ -151,7 +151,7 @@ export default function ArkivHelloWorld() {
                         <div className="flex flex-col gap-1">
                           <span className="text-xs font-semibold text-gray-400 uppercase">Entity</span>
                           <a
-                            href={`https://explorer.mendoza.hoodi.arkiv.network/entity/${msg.id}`}
+                            href={`https://explorer.braga.hoodi.arkiv.network/entity/${msg.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-700 hover:underline text-xs font-mono"
@@ -164,7 +164,7 @@ export default function ArkivHelloWorld() {
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-semibold text-gray-400 uppercase">Transaction</span>
                             <a
-                              href={`https://explorer.mendoza.hoodi.arkiv.network/tx/${msg.txHash}`}
+                              href={`https://explorer.braga.hoodi.arkiv.network/tx/${msg.txHash}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-700 hover:underline text-xs font-mono"

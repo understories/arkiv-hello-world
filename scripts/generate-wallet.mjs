@@ -17,7 +17,7 @@ console.log('Address:', account.address);
 console.log('Private Key:', privateKey);
 console.log('\n⚠️  Keep your private key secure!');
 console.log('\nNext steps:');
-console.log('1. Get testnet tokens from: https://mendoza.hoodi.arkiv.network/faucet/');
+console.log('1. Get testnet tokens from: https://braga.hoodi.arkiv.network/faucet/');
 console.log('2. Add your private key to .env file:');
 console.log(`   ARKIV_PRIVATE_KEY=${privateKey}`);
 console.log('');

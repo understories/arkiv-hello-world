@@ -35,7 +35,7 @@ A simple decentralized message board powered by Arkiv. This is the starter templ
 
 5. **Get testnet tokens:**
    - Generate a wallet using the [Arkiv Getting Started guide](https://arkiv.network/getting-started/typescript)
-   - Get testnet tokens from the [Mendoza Testnet Faucet](https://mendoza.hoodi.arkiv.network/faucet/)
+   - Get testnet tokens from the [Braga Testnet Faucet](https://braga.hoodi.arkiv.network/faucet/)
    - Add your private key to `.env`
 
 6. **Run development server:**
@@ -85,7 +85,7 @@ arkiv-hello-world/
 2. **Creating entities:** The API creates a `workshop_message` entity on Arkiv with your message
 3. **Shared space:** All entities use `spaceId='ns'`, so they're queryable by anyone
 4. **Reading messages:** The page queries all `workshop_message` entities with `spaceId='ns'`
-5. **Decentralized:** No central database - all data lives on Arkiv (Mendoza testnet)
+5. **Decentralized:** No central database - all data lives on Arkiv (Braga testnet)
 
 ## Verification
 
@@ -100,7 +100,7 @@ arkiv-hello-world/
 - [Serverless DApp 101 Tutorial](https://serverlessdapp101.vercel.app) - Full tutorial
 - [Arkiv Network](https://arkiv.network) - Official documentation
 - [Arkiv Getting Started](https://arkiv.network/getting-started/typescript) - Wallet generation
-- [Mendoza Testnet Faucet](https://mendoza.hoodi.arkiv.network/faucet/) - Get testnet tokens
+- [Braga Testnet Faucet](https://braga.hoodi.arkiv.network/faucet/) - Get testnet tokens
 
 ## License
 
