@@ -7,7 +7,7 @@
 
 import { createPublicClient, createWalletClient, http } from "@arkiv-network/sdk"
 import { privateKeyToAccount } from "@arkiv-network/sdk/accounts"
-import { mendoza } from "@arkiv-network/sdk/chains"
+import { braga } from "@arkiv-network/sdk/chains"
 
 /**
  * Get public client for read operations
@@ -15,20 +15,20 @@ import { mendoza } from "@arkiv-network/sdk/chains"
  */
 export function getPublicClient() {
   return createPublicClient({
-    chain: mendoza,
+    chain: braga,
     transport: http(),
   });
 }
 
 /**
  * Get wallet client from private key (server-side use)
- * 
+ *
  * @param privateKey - Private key in format 0x...
- * @returns Wallet client configured for Mendoza testnet
+ * @returns Wallet client configured for Braga testnet
  */
 export function getWalletClientFromPrivateKey(privateKey: `0x${string}`) {
   return createWalletClient({
-    chain: mendoza,
+    chain: braga,
     transport: http(),
     account: privateKeyToAccount(privateKey),
   });

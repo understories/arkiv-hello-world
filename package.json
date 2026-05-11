@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@arkiv-network/sdk": "^0.4.4",
+    "@arkiv-network/sdk": "^0.6.7",
     "next": "^15.5.9",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
