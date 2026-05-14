@@ -10,11 +10,14 @@ interface Message {
   txHash?: string; // Transaction hash
 }
 
+type LastWrite = { entityKey: string; txHash: string };
+
 export default function ArkivHelloWorld() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [lastWrite, setLastWrite] = useState<LastWrite | null>(null);
 
   // Load messages on mount
   useEffect(() => {
@@ -51,6 +54,9 @@ export default function ArkivHelloWorld() {
       
       if (data.ok) {
         setNewMessage('');
+        if (data.entityKey && data.txHash) {
+          setLastWrite({ entityKey: data.entityKey, txHash: data.txHash });
+        }
         // Reload messages after a short delay (indexer lag)
         setTimeout(loadMessages, 2000);
       } else {
@@ -94,6 +100,30 @@ export default function ArkivHelloWorld() {
               (don't worry; no funds needed), but your messages will still appear here!
             </p>
           </div>
+
+          {lastWrite && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <p className="text-sm font-semibold text-green-800 mb-1">Posted! Both views on the Braga explorer:</p>
+              <div className="flex flex-wrap gap-4 text-xs font-mono">
+                <a
+                  href={`https://explorer.braga.hoodi.arkiv.network/entity/${lastWrite.entityKey}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-700 hover:underline"
+                >
+                  Entity: {lastWrite.entityKey.slice(0, 16)}...
+                </a>
+                <a
+                  href={`https://explorer.braga.hoodi.arkiv.network/tx/${lastWrite.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-700 hover:underline"
+                >
+                  Transaction: {lastWrite.txHash.slice(0, 16)}...
+                </a>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={submitMessage} className="mb-6">
             <div className="flex gap-2">
@@ -189,7 +219,7 @@ export default function ArkivHelloWorld() {
               <li>• Creating an entity is also a <strong>transaction</strong> on the blockchain</li>
               <li>• <strong>Entity</strong> = the data (your message, attributes, payload)</li>
               <li>• <strong>Transaction</strong> = the blockchain operation that creates/records that entity</li>
-              <li>• Anyone can read these messages (they're in the shared "ns" space)</li>
+              <li>• Every entity is stamped with a <strong>project attribute</strong> so this app only reads its own data on shared Braga</li>
               <li>• No central database required!</li>
             </ul>
             <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
