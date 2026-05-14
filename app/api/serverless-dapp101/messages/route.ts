@@ -1,275 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPublicClient, getWalletClientFromPrivateKey } from '../../../../lib/arkiv/client';
-import { SPACE_ID, getPrivateKey } from '../../../../lib/config';
-import { handleTransactionWithTimeout } from '../../../../lib/arkiv/transaction-utils';
-import { isTransactionTimeoutError, isRateLimitError } from '../../../../lib/arkiv/transaction-utils';
+import { PROJECT_ATTRIBUTE, getPrivateKey } from '../../../../lib/config';
 import { eq } from '@arkiv-network/sdk/query';
+import { jsonToPayload, ExpirationTime } from '@arkiv-network/sdk/utils';
+import { EntityMutationError } from '@arkiv-network/sdk';
 
-// TextEncoder is available globally in Node.js 18+
-const enc = new TextEncoder();
+const MESSAGE_TYPE = 'workshop_message';
 
-// GET: List messages
+/**
+ * GET /api/serverless-dapp101/messages
+ *
+ * Lists all messages for this project. Filters by PROJECT_ATTRIBUTE so this
+ * query only sees this workshop's data, never other projects sharing Braga.
+ */
 export async function GET() {
   try {
     const publicClient = getPublicClient();
-    
-    // Query messages from Arkiv using query builder
-    // Use BETA_SPACE_ID env var if set (for workshop), otherwise use default from config
-    const querySpaceId = process.env.BETA_SPACE_ID || SPACE_ID;
-    
-    // Query multiple spaceIds to ensure we catch all messages regardless of which space they were created in
-    // This handles cases where students might have used different spaceIds
-    // Always include 'ns' (default shared space) and the configured spaceId
-    const spaceIdsToQuery = Array.from(new Set([querySpaceId, 'ns']));
-    
-    // Fetch messages and txHash entities from all spaces in parallel
-    const [messageResults, txHashResults] = await Promise.all([
-      Promise.all(
-        spaceIdsToQuery.map(spaceId =>
-          publicClient
-            .buildQuery()
-            .where(eq('type', 'workshop_message'))
-            .where(eq('spaceId', spaceId))
-            .withAttributes(true)
-            .withPayload(true)
-            .limit(100)
-            .fetch()
-        )
-      ),
-      Promise.all(
-        spaceIdsToQuery.map(spaceId =>
-          publicClient
-            .buildQuery()
-            .where(eq('type', 'workshop_message_txhash'))
-            .where(eq('spaceId', spaceId))
-            .withAttributes(true)
-            .withPayload(true)
-            .limit(100)
-            .fetch()
-        )
-      ),
-    ]);
-    
-    // Combine results from all spaces
-    const result = {
-      entities: messageResults.flatMap(r => r.entities || []),
-    };
-    const txHashResult = {
-      entities: txHashResults.flatMap(r => r.entities || []),
-    };
-    
-    // Build txHash map from companion entities
-    const txHashMap: Record<string, string> = {};
-    if (txHashResult?.entities && Array.isArray(txHashResult.entities)) {
-      txHashResult.entities.forEach((entity: any) => {
+    const result = await publicClient
+      .buildQuery()
+      .where([eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value), eq('type', MESSAGE_TYPE)])
+      .withPayload(true)
+      .withAttributes(true)
+      .withMetadata(true)
+      .limit(100)
+      .fetch();
+
+    const messages = result.entities.map((e) => {
+      const data = (() => {
         try {
-          const attrs = entity.attributes || {};
-          const getAttr = (key: string): string => {
-            if (Array.isArray(attrs)) {
-              const attr = attrs.find((a: any) => a.key === key);
-              return String(attr?.value || '');
-            }
-            return String(attrs[key] || '');
-          };
-          const messageKey = getAttr('messageKey');
-          if (messageKey) {
-            let payload: any = {};
-            if (entity.payload) {
-              const decoded = entity.payload instanceof Uint8Array
-                ? new TextDecoder().decode(entity.payload)
-                : typeof entity.payload === 'string'
-                ? entity.payload
-                : JSON.stringify(entity.payload);
-              payload = JSON.parse(decoded);
-            }
-            txHashMap[messageKey] = payload.txHash || getAttr('txHash') || '';
-          }
-        } catch (e) {
-          console.error('[messages/route] Error processing txHash entity:', e);
+          return e.toJson() as { text?: string; createdAt?: string };
+        } catch {
+          return {};
         }
-      });
-    }
-    
-    // Parse messages from entities
-    const messages = (result.entities || []).map((entity: any) => {
-      let payload: any = {};
-      try {
-        if (entity.payload) {
-          const decoded = entity.payload instanceof Uint8Array
-            ? new TextDecoder().decode(entity.payload)
-            : typeof entity.payload === 'string'
-            ? entity.payload
-            : JSON.stringify(entity.payload);
-          payload = JSON.parse(decoded);
-        }
-      } catch (e) {
-        console.error('Error decoding payload:', e);
-      }
-      
-      const attrs = entity.attributes || {};
-      const getAttr = (key: string): string => {
-        if (Array.isArray(attrs)) {
-          const attr = attrs.find((a: any) => a.key === key);
-          return String(attr?.value || '');
-        }
-        return String(attrs[key] || '');
-      };
-      
-      const entityKey = entity.key || entity.entityKey || '';
+      })();
       return {
-        id: entityKey,
-        text: payload.text || getAttr('text') || '',
-        wallet: getAttr('wallet') || '',
-        createdAt: payload.createdAt || getAttr('created_at') || '',
-        txHash: txHashMap[entityKey] || getAttr('txHash') || (entity as any).txHash || '',
+        id: e.key,
+        wallet: (e.owner ?? '').toLowerCase(),
+        text: data.text ?? '',
+        createdAt: data.createdAt ?? '',
       };
     });
-    
-    // Deduplicate by entity key (in case same message appears in multiple spaces)
-    const seenKeys = new Set<string>();
-    const uniqueMessages = messages.filter(msg => {
-      if (seenKeys.has(msg.id)) {
-        return false;
-      }
-      seenKeys.add(msg.id);
-      return true;
-    });
-    
-    // Sort by creation time (newest first)
-    uniqueMessages.sort((a, b) => {
-      const aTime = new Date(a.createdAt).getTime();
-      const bTime = new Date(b.createdAt).getTime();
-      return bTime - aTime;
-    });
-    
-    return NextResponse.json({
-      ok: true,
-      messages: uniqueMessages,
-    });
+
+    messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return NextResponse.json({ ok: true, messages });
   } catch (error: any) {
-    console.error('[messages/route] Error listing messages:', {
-      message: error?.message,
-      stack: error?.stack,
-      error,
-    });
-    // Return empty array on query failure (graceful degradation per engineering guidelines)
+    console.error('[messages/route] Error listing messages:', error?.message);
     return NextResponse.json(
-      {
-        ok: false,
-        error: error?.message || 'Failed to list messages',
-        messages: [],
-      },
-      { status: 500 }
+      { ok: false, error: error?.message || 'Failed to list messages', messages: [] },
+      { status: 500 },
     );
   }
 }
 
-// POST: Create a new message
+/**
+ * POST /api/serverless-dapp101/messages
+ * Body: { text: string }
+ *
+ * Creates one workshop_message entity. Returns the entityKey and txHash so
+ * the client can deep-link to the explorer for either view.
+ */
 export async function POST(request: NextRequest) {
   try {
-    const privateKey = getPrivateKey(); // Throws if not configured
     const body = await request.json();
-    const { text } = body;
-    
+    const text: string | undefined = body?.text;
     if (!text || !text.trim()) {
-      return NextResponse.json(
-        { ok: false, error: 'Message text is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: 'Message text is required' }, { status: 400 });
     }
-    
-    const walletClient = getWalletClientFromPrivateKey(privateKey);
-    const walletAddress = walletClient.account.address.toLowerCase();
-    
-    // Use BETA_SPACE_ID env var if set (for workshop), otherwise use default from config
-    const querySpaceId = process.env.BETA_SPACE_ID || SPACE_ID;
-    
-    // Create payload
-    const payload = JSON.stringify({
-      text: text.trim(),
-      createdAt: new Date().toISOString(),
+
+    const walletClient = getWalletClientFromPrivateKey(getPrivateKey());
+    const now = Date.now();
+
+    const { entityKey, txHash } = await walletClient.createEntity({
+      payload: jsonToPayload({ text: text.trim(), createdAt: new Date(now).toISOString() }),
+      contentType: 'application/json',
+      attributes: [
+        PROJECT_ATTRIBUTE,
+        { key: 'type', value: MESSAGE_TYPE },
+        { key: 'createdAtMs', value: now },
+      ],
+      expiresIn: ExpirationTime.fromDays(180),
     });
-    
-    // Create attributes (as array of key-value pairs, matching codebase pattern)
-    const attributes = [
-      { key: 'type', value: 'workshop_message' },
-      { key: 'wallet', value: walletAddress }, // Already normalized to lowercase
-      { key: 'spaceId', value: querySpaceId },
-      { key: 'created_at', value: new Date().toISOString() },
-    ];
-    
-    // Create entity on Arkiv with timeout handling (required by engineering guidelines)
-    const result = await handleTransactionWithTimeout(async () => {
-      return await walletClient.createEntity({
-        payload: enc.encode(payload),
-        attributes,
-        contentType: 'application/json',
-        expiresIn: 15768000, // 6 months
-      });
-    });
-    
-    const { entityKey, txHash } = result;
-    
-    // Create txHash companion entity for reliable querying (required by engineering guidelines)
-    try {
-      await walletClient.createEntity({
-        payload: enc.encode(JSON.stringify({ txHash })),
-        contentType: 'application/json',
-        attributes: [
-          { key: 'type', value: 'workshop_message_txhash' },
-          { key: 'messageKey', value: entityKey },
-          { key: 'txHash', value: txHash },
-          { key: 'spaceId', value: querySpaceId },
-        ],
-        expiresIn: 15768000,
-      });
-    } catch (error: any) {
-      // Non-blocking: log warning but don't fail the request
-      console.warn('[messages/route] Failed to create txhash entity, but message was created:', error);
-    }
-    
-    return NextResponse.json({
-      ok: true,
-      status: 'submitted',
-      entityKey,
-      txHash,
-      message: 'Message created. It may take a moment to appear in queries.',
-    });
+
+    return NextResponse.json({ ok: true, entityKey, txHash });
   } catch (error: any) {
-    console.error('[messages/route] Error creating message:', {
-      message: error?.message,
-      error,
-    });
-    
-    // Handle transaction timeout errors (common on testnets)
-    if (isTransactionTimeoutError(error)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: error?.message || 'Transaction submitted but confirmation pending. Please wait a moment and refresh.',
-          status: 'submitted_or_pending',
-        },
-        { status: 202 } // Accepted but not yet confirmed
-      );
+    console.error('[messages/route] Error creating message:', error?.message);
+    if (error instanceof EntityMutationError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 502 });
     }
-    
-    // Handle rate limit errors
-    if (isRateLimitError(error)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Rate limit exceeded. Please wait a moment and try again.',
-        },
-        { status: 429 }
-      );
-    }
-    
     return NextResponse.json(
-      {
-        ok: false,
-        error: error?.message || 'Failed to create message',
-      },
-      { status: 500 }
+      { ok: false, error: error?.message || 'Failed to create message' },
+      { status: 500 },
     );
   }
 }
