@@ -5,10 +5,10 @@ A simple decentralized message board powered by Arkiv. This is the starter templ
 ## What This Demonstrates
 
 - **Read path:** Querying Arkiv entities via `createPublicClient` + query builder
-- **Write path:** Server-signed writes via Next.js API routes (Phase 0)
-- **Optimistic UI:** Handling "submitted vs indexed" states gracefully
-- **Error handling:** Timeout, rate limit, and network error classification
-- **Shared space:** Uses `SPACE_ID=ns` so all messages appear on the main demo page
+- **Write path:** Server-signed writes via Next.js API routes
+- **Project namespacing:** Every entity stamped with `PROJECT_ATTRIBUTE`, the canonical multi-tenant pattern on shared Braga
+- **Idiomatic helpers:** `jsonToPayload`, `ExpirationTime.fromDays`, named SDK error classes (`EntityMutationError`)
+- **Optimistic UI:** "Submitted" feedback with explorer deep-links right after a write
 
 ## Quick Start
 
@@ -29,9 +29,11 @@ A simple decentralized message board powered by Arkiv. This is the starter templ
    ```bash
    cp .env.example .env
    # Edit .env and set:
-   # - SPACE_ID=ns (shared workshop space - already set)
-   # - ARKIV_PRIVATE_KEY=0x... (your testnet wallet private key)
+   # - ARKIV_PRIVATE_KEY=0x... (your testnet wallet private key, funded on Braga)
+   # - SPACE_ID=ns (optional secondary grouping; defaults to 'ns')
    ```
+
+   The project namespace itself (`PROJECT_ATTRIBUTE`) is defined in `lib/config.ts`, not in env.
 
 5. **Get testnet tokens:**
    - Generate a wallet using the [Arkiv Getting Started guide](https://arkiv.network/getting-started/typescript)
@@ -47,45 +49,46 @@ A simple decentralized message board powered by Arkiv. This is the starter templ
    - Homepage: `http://localhost:3000`
    - Hello World Demo: `http://localhost:3000/hello-world`
 
-## Important: Shared Workshop Space
+## Important: PROJECT_ATTRIBUTE Namespacing
 
-This demo uses `SPACE_ID=ns` by default. This means:
-- ✅ Messages from **any wallet** will appear on the main demo page
-- ✅ All tutorial participants can see each other's messages
-- ✅ Demonstrates the decentralized nature of Arkiv
-- ✅ No central database - all data is on-chain
+This template uses `PROJECT_ATTRIBUTE = { key: 'project', value: 'serverless-dapp101' }` (defined in `lib/config.ts`). Every entity is stamped with it on creation and every query filters on it.
+
+- ✅ Messages from **any wallet** appear in the same list (queries filter by project, not by wallet)
+- ✅ All tutorial participants see each other's messages
+- ✅ This app's queries are isolated from every other Arkiv app on shared Braga
+- ✅ No central database; all data is on-chain
 
 When you create a message from your local app, it will appear on:
 - Your local app at `http://localhost:3000/hello-world`
 - The main demo at `https://serverlessdapp101.vercel.app/hello-world`
-- Any other app using `SPACE_ID=ns`
+- Any other fork of this template that keeps the same `PROJECT_ATTRIBUTE` value
+
+If you fork this for your own project, change the value in `lib/config.ts` to something globally unique (project name + short suffix is fine).
 
 ## Project Structure
 
 ```
 arkiv-hello-world/
 ├── app/
-│   ├── hello-world/page.tsx          # Message board UI
+│   ├── hello-world/page.tsx          # Message board UI with last-write banner
 │   ├── api/serverless-dapp101/
-│   │   └── messages/route.ts        # Messages API
+│   │   └── messages/route.ts        # Messages API (GET list, POST create)
 │   ├── page.tsx                     # Homepage
 │   └── layout.tsx                   # Root layout
 ├── lib/
-│   ├── arkiv/
-│   │   ├── client.ts                # Arkiv client utilities
-│   │   └── transaction-utils.ts    # Transaction helpers
-│   └── config.ts                    # Configuration (SPACE_ID, etc.)
+│   ├── arkiv/client.ts              # Braga public + wallet client factories
+│   └── config.ts                    # PROJECT_ATTRIBUTE, SPACE_ID, getPrivateKey()
 ├── .env.example                     # Environment variable template
 └── README.md                        # This file
 ```
 
 ## How It Works
 
-1. **Writing messages:** When you submit a message, it's sent to `/api/serverless-dapp101/messages` (POST)
-2. **Creating entities:** The API creates a `workshop_message` entity on Arkiv with your message
-3. **Shared space:** All entities use `spaceId='ns'`, so they're queryable by anyone
-4. **Reading messages:** The page queries all `workshop_message` entities with `spaceId='ns'`
-5. **Decentralized:** No central database - all data lives on Arkiv (Braga testnet)
+1. **Writing messages:** POST to `/api/serverless-dapp101/messages`, which calls `walletClient.createEntity` with the `PROJECT_ATTRIBUTE`, a `type` discriminator, and a numeric `createdAtMs` (for future range queries). Uses `jsonToPayload` and `ExpirationTime.fromDays(180)`.
+2. **Creating entities:** `createEntity` returns `{ entityKey, txHash }`. The UI shows a banner with both explorer deep-links right after a write.
+3. **Project namespacing:** Every entity has `project = 'serverless-dapp101'`; the GET query filters on it so this app reads only its own data.
+4. **Reading messages:** `publicClient.buildQuery().where([...]).withPayload(true).withMetadata(true).limit(100).fetch()`, then `entity.toJson()` to decode each payload.
+5. **Decentralized:** no central database; all data lives on Arkiv (Braga testnet).
 
 ## Verification
 
